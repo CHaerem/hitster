@@ -20,7 +20,7 @@ Første spiller som samler nok kort vinner! 🏆
 - 🎧 **Spotify-integrasjon** — Sanger spilles direkte via Spotify Embed API
 - 📱 **Mobilvennlig** — Designet for å sende telefonen rundt
 - 💾 **Auto-lagring** — Refresh siden uten å miste fremgangen
-- 🎶 **130 sanger** — Fra 1950-tallet til 2020-tallet
+- 🎶 **170 sanger** — Fra 1950-tallet til 2020-tallet
 - 🔒 **Skjult sanginfo** — Tittel og artist vises ikke før du har plassert
 
 ## Kjøring

@@ -3,6 +3,12 @@ const SONGS_DATABASE = [
     // 1950s
     { title: "Johnny B. Goode", artist: "Chuck Berry", year: 1958, spotifyId: "4OqHfSB4UN2THL2cYAFN3L" },
     { title: "Jailhouse Rock", artist: "Elvis Presley", year: 1957, spotifyId: "5VnDkUNyX6u5Sk0yZiP8XB" },
+    { title: "Hound Dog", artist: "Elvis Presley", year: 1956, spotifyId: "64Ny7djQ6rNJspquof2KoX" },
+    { title: "Rock Around the Clock", artist: "Bill Haley & His Comets", year: 1954, spotifyId: "7hLOIb9E7VKmsVelNq6YZK" },
+    { title: "Great Balls of Fire", artist: "Jerry Lee Lewis", year: 1957, spotifyId: "7xe3EQCvXnx6Q0zs41Y65n" },
+    { title: "La Bamba", artist: "Ritchie Valens", year: 1958, spotifyId: "2aEeghgUcnu75tzcolFMfs" },
+    { title: "Tutti Frutti", artist: "Little Richard", year: 1955, spotifyId: "17nFSc5cJ3AHKt7qsGFtsz" },
+    { title: "Peggy Sue", artist: "Buddy Holly", year: 1957, spotifyId: "5I3m1pOJoA8fgEMH8SWCJx" },
 
     // 1960s
     { title: "Hey Jude", artist: "The Beatles", year: 1968, spotifyId: "0aym2LBJBk9DAYuHHutrIl" },
@@ -10,6 +16,14 @@ const SONGS_DATABASE = [
     { title: "Respect", artist: "Aretha Franklin", year: 1967, spotifyId: "7s25THrKz86DM225dOYwnr" },
     { title: "What a Wonderful World", artist: "Louis Armstrong", year: 1967, spotifyId: "29U7stRjqHU6rMiS8BfaI9" },
     { title: "Stand By Me", artist: "Ben E. King", year: 1961, spotifyId: "3SdTKo2uVsxFblQjpScoHy" },
+    { title: "My Girl", artist: "The Temptations", year: 1964, spotifyId: "745H5CctFr12Mo7cqa1BMH" },
+    { title: "I Got You (I Feel Good)", artist: "James Brown", year: 1965, spotifyId: "5haXbSJqjjM0TCJ5XkfEaC" },
+    { title: "Good Vibrations", artist: "The Beach Boys", year: 1966, spotifyId: "5t9KYe0Fhd5cW6UYT4qP8f" },
+    { title: "Paint It Black", artist: "The Rolling Stones", year: 1966, spotifyId: "63T7DJ1AFDD6Bn8VzG6JE8" },
+    { title: "Fortunate Son", artist: "Creedence Clearwater Revival", year: 1969, spotifyId: "4BP3uh0hFLFRb5cjsgLqDh" },
+    { title: "Come Together", artist: "The Beatles", year: 1969, spotifyId: "2EqlS6tkEnglzr7tkKAAYD" },
+    { title: "Ring of Fire", artist: "Johnny Cash", year: 1963, spotifyId: "6YffUZJ2R06kyxyK6onezL" },
+    { title: "A Change Is Gonna Come", artist: "Sam Cooke", year: 1964, spotifyId: "5CjXQuNWHrLiZGbeF1sZhq" },
 
     // 1970s
     { title: "Bohemian Rhapsody", artist: "Queen", year: 1975, spotifyId: "7tFiyTwD0nx5a1eklYtX2J" },
@@ -25,6 +39,11 @@ const SONGS_DATABASE = [
     { title: "I Will Survive", artist: "Gloria Gaynor", year: 1978, spotifyId: "5r3U0Z4jWEWEW2l0fdFxpZ" },
     { title: "Dreams", artist: "Fleetwood Mac", year: 1977, spotifyId: "0ofHAoxe9vBkTCp2UQIavz" },
     { title: "Go Your Own Way", artist: "Fleetwood Mac", year: 1977, spotifyId: "4lhFBcrzqfMKoP3Z8E3HIx" },
+    { title: "Superstition", artist: "Stevie Wonder", year: 1972, spotifyId: "4xjgiJ19s0pfRjDgoQFznR" },
+    { title: "Heart of Gold", artist: "Neil Young", year: 1972, spotifyId: "1Q1b8eVkUPGlpSArl8JAVw" },
+    { title: "Heroes", artist: "David Bowie", year: 1977, spotifyId: "7Jh1bpe76CNTCgdgAdBw4Z" },
+    { title: "Born to Run", artist: "Bruce Springsteen", year: 1975, spotifyId: "6hTcuIQa0sxrrByu9wTD7s" },
+    { title: "September", artist: "Earth, Wind & Fire", year: 1978, spotifyId: "4f2GB5ZC7vOUYPAg69N2Xw" },
 
     // 1980s
     { title: "Billie Jean", artist: "Michael Jackson", year: 1983, spotifyId: "7J1uxwnxfQLu4APicE5Rnj" },
@@ -63,6 +82,13 @@ const SONGS_DATABASE = [
     { title: "Believe", artist: "Cher", year: 1998, spotifyId: "2goLsvvODILDzeeiT4dAoR" },
     { title: "Bitter Sweet Symphony", artist: "The Verve", year: 1997, spotifyId: "57iDDD9N4BmXD3sQIGNlxm" },
     { title: "Torn", artist: "Natalie Imbruglia", year: 1997, spotifyId: "0KDaN0HL3TcJVTbXlQCEsS" },
+    { title: "Losing My Religion", artist: "R.E.M.", year: 1991, spotifyId: "31AOj9sFz2gM0O3hMARRBx" },
+    { title: "No Diggity", artist: "Blackstreet", year: 1996, spotifyId: "0F7iKgb1qGKMAmmB5JfpXa" },
+    { title: "Killing Me Softly", artist: "Fugees", year: 1996, spotifyId: "0Q0IVlqMV64kNLlwjPj0Hl" },
+    { title: "MMMBop", artist: "Hanson", year: 1997, spotifyId: "0lnxrQAd9ZxbhBBe7d8FO8" },
+    { title: "I Want It That Way", artist: "Backstreet Boys", year: 1999, spotifyId: "47BBI51FKFwOMlIiX6m8ya" },
+    { title: "Waterfalls", artist: "TLC", year: 1995, spotifyId: "6qspW4YKycviDFjHBOaqUY" },
+    { title: "California Love", artist: "2Pac", year: 1995, spotifyId: "61bLhALkT5ibYHRZFNfyxZ" },
 
     // 2000s
     { title: "Crazy in Love", artist: "Beyonce", year: 2003, spotifyId: "5IVuqXILoxVWvWEPm82Jxr" },
@@ -83,6 +109,10 @@ const SONGS_DATABASE = [
     { title: "Feel Good Inc.", artist: "Gorillaz", year: 2005, spotifyId: "0d28khcov6AiegSCpG5TuT" },
     { title: "Yeah!", artist: "Usher", year: 2004, spotifyId: "1Cwml2JIvDNf70AjN4QGYP" },
     { title: "Love Story", artist: "Taylor Swift", year: 2008, spotifyId: "1vrd6UOGamcKNGnSHJQlSt" },
+    { title: "Maps", artist: "Yeah Yeah Yeahs", year: 2003, spotifyId: "0hDQV9X1Da5JrwhK8gu86p" },
+    { title: "Clocks", artist: "Coldplay", year: 2002, spotifyId: "0BCPKOYdS2jbQ8iyB56Zns" },
+    { title: "Paper Planes", artist: "M.I.A.", year: 2007, spotifyId: "1ixbwbeBi5ufN4noUKmW5a" },
+    { title: "SOS", artist: "Rihanna", year: 2006, spotifyId: "6fG7EM3KWxiBSeyL5m6Ibp" },
 
     // 2010s
     { title: "Rolling in the Deep", artist: "Adele", year: 2011, spotifyId: "6IAZHEBUIGJ6NJKxxOBIEr" },
@@ -145,6 +175,16 @@ const SONGS_DATABASE = [
     { title: "Vampire", artist: "Olivia Rodrigo", year: 2023, spotifyId: "1kuGVB7EU95pJObxwvfwKS" },
     { title: "Kill Bill", artist: "SZA", year: 2022, spotifyId: "1Qrg8KqiBpW07V7PNxwwwL" },
     { title: "Cruel Summer", artist: "Taylor Swift", year: 2019, spotifyId: "1BxfuPKGuaTgP7aM0Bbdwr" },
+    { title: "Espresso", artist: "Sabrina Carpenter", year: 2024, spotifyId: "2qSkIjg1o9h3YT9RAgYN75" },
+    { title: "Snooze", artist: "SZA", year: 2022, spotifyId: "5gHx5zPHcs5yYQC2jKFnVZ" },
+    { title: "Unholy", artist: "Sam Smith & Kim Petras", year: 2022, spotifyId: "3nqQXoyQOWXiESFLlDF1hG" },
+    { title: "Calm Down", artist: "Rema & Selena Gomez", year: 2022, spotifyId: "0WtM2NBVQNNJLh6scP13H8" },
+    { title: "Paint The Town Red", artist: "Doja Cat", year: 2023, spotifyId: "2IGMVunIBsBLtEQyoI1Mu7" },
+    { title: "Fortnight", artist: "Taylor Swift ft. Post Malone", year: 2024, spotifyId: "6GrvlxquXWumwyNeZb1oZz" },
+    { title: "Die With A Smile", artist: "Lady Gaga & Bruno Mars", year: 2024, spotifyId: "2plbrEY59IikOBgBGLjaoe" },
+    { title: "Birds of a Feather", artist: "Billie Eilish", year: 2024, spotifyId: "6dOtVTDdiauQNBQEDOtlAB" },
+    { title: "Greedy", artist: "Tate McRae", year: 2023, spotifyId: "3rUGC1vUpkDG9CZFHMur1t" },
+    { title: "Lovin On Me", artist: "Jack Harlow", year: 2023, spotifyId: "4xhsWYTOGcal8zt0J161CU" },
 ];
 
 // Fisher-Yates shuffle
