@@ -30,6 +30,8 @@ const Game = {
                 score: 1,
             };
         });
+
+        this.saveState();
     },
 
     get currentPlayer() {
@@ -157,13 +159,11 @@ const Game = {
             player.score = player.timeline.length;
         }
 
+        this.saveState();
         this.showReveal(correct);
     },
 
     showReveal(correct) {
-        // Show embed to reveal song info
-        document.querySelector('.spotify-player-wrapper').classList.remove('hidden-player');
-
         const overlay = document.getElementById('song-reveal-overlay');
         const icon = document.getElementById('reveal-result-icon');
         const title = document.getElementById('reveal-title');
@@ -199,6 +199,7 @@ const Game = {
         }
 
         this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+        this.saveState();
         this.showPassPhone();
     },
 
@@ -216,6 +217,7 @@ const Game = {
     },
 
     showWinner(winner) {
+        this.clearState();
         document.getElementById('winner-name').textContent = winner.name;
 
         const scoresEl = document.getElementById('final-scores');
@@ -345,6 +347,44 @@ const Game = {
         if (this.selectedDropIndex !== null) {
             this.placeSong(this.selectedDropIndex);
         }
+    },
+
+    // Save game state to localStorage
+    saveState() {
+        const state = {
+            players: this.players,
+            currentPlayerIndex: this.currentPlayerIndex,
+            cardsToWin: this.cardsToWin,
+            usedSongs: [...this.usedSongs],
+        };
+        localStorage.setItem('hitster-game', JSON.stringify(state));
+    },
+
+    // Restore game state from localStorage (returns true if restored)
+    restoreState() {
+        const data = localStorage.getItem('hitster-game');
+        if (!data) return false;
+        try {
+            const state = JSON.parse(data);
+            this.players = state.players;
+            this.currentPlayerIndex = state.currentPlayerIndex;
+            this.cardsToWin = state.cardsToWin;
+            this.usedSongs = new Set(state.usedSongs);
+            this.deck = shuffleArray(SONGS_DATABASE.filter(s => {
+                const key = `${s.title}-${s.artist}`;
+                return !this.usedSongs.has(key);
+            }));
+            this.currentSong = null;
+            this.isWaitingForPlacement = false;
+            this.selectedDropIndex = null;
+            return true;
+        } catch {
+            return false;
+        }
+    },
+
+    clearState() {
+        localStorage.removeItem('hitster-game');
     },
 
     escapeHtml(str) {

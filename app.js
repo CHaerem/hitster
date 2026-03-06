@@ -3,7 +3,12 @@ const App = {
     winCount: 10,
 
     init() {
-        // Nothing to restore - no auth needed!
+        // Restore game state if page was refreshed mid-game
+        if (Game.restoreState()) {
+            this.showScreen('screen-game');
+            Game.renderScores();
+            Game.showPassPhone();
+        }
     },
 
     showScreen(screenId) {
@@ -76,8 +81,10 @@ const App = {
     },
 
     restart() {
+        Game.clearState();
         this.showScreen('screen-setup');
     },
 };
 
-document.addEventListener('DOMContentLoaded', () => App.init());
+// Scripts are at end of body so DOM is ready - init immediately
+App.init();
