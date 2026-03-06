@@ -7,7 +7,13 @@ const App = {
         if (Game.restoreState()) {
             this.showScreen('screen-game');
             Game.renderScores();
-            Game.showPassPhone();
+            if (Game.currentSong) {
+                // Mid-turn refresh: resume with the same song
+                Game.startTurn(Game.currentSong);
+            } else {
+                // Between turns: show pass phone
+                Game.showPassPhone();
+            }
         }
     },
 

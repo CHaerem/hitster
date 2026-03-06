@@ -277,12 +277,21 @@ const Game = {
         document.querySelector('.listening-text').textContent = 'Starter avspilling...';
     },
 
-    // Start a new turn
-    async startTurn() {
-        this.currentSong = this.drawSong();
+    // Start a new turn (or resume a saved turn)
+    startTurn(resumeSong) {
+        if (resumeSong) {
+            // Resuming after page refresh — use the saved song
+            this.currentSong = resumeSong;
+        } else {
+            // Normal new turn — draw a fresh song
+            this.currentSong = this.drawSong();
+        }
         this.isWaitingForPlacement = true;
         this.selectedDropIndex = null;
         this.hasPlayedSong = false;
+
+        // Save immediately so currentSong persists across refresh
+        this.saveState();
 
         // Update UI
         this.renderScores();
@@ -397,6 +406,7 @@ const Game = {
 
     nextTurn() {
         this.lastPlacement = null;
+        this.currentSong = null; // Clear so refresh between turns doesn't resume old song
         const overlay = document.getElementById('song-reveal-overlay');
         overlay.classList.remove('active');
 
@@ -568,6 +578,7 @@ const Game = {
             cardsToWin: this.cardsToWin,
             usedSongs: [...this.usedSongs],
             lastPlacement: this.lastPlacement,
+            currentSong: this.currentSong,
         };
         localStorage.setItem('hitster-game', JSON.stringify(state));
     },
@@ -586,7 +597,7 @@ const Game = {
                 const key = `${s.title}-${s.artist}`;
                 return !this.usedSongs.has(key);
             }));
-            this.currentSong = null;
+            this.currentSong = state.currentSong || null;
             this.isWaitingForPlacement = false;
             this.selectedDropIndex = null;
             this.lastPlacement = state.lastPlacement || null;
