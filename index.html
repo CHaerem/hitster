@@ -55,16 +55,20 @@
             </div>
 
             <div class="settings-section songs-section">
-                <h3>Sangliste</h3>
+                <h3>Sanger</h3>
                 <div class="song-source-info">
-                    <span class="song-source-badge" id="song-source-badge">Standard (213 sanger)</span>
+                    <span class="song-source-badge" id="song-source-badge">Standard</span>
                 </div>
-                <div class="song-url-row">
-                    <input type="text" id="playlist-url" placeholder="Lim inn Spotify-spilleliste URL" autocomplete="off">
-                    <button class="btn btn-secondary btn-sm" onclick="App.loadPlaylist()">Last</button>
-                </div>
-                <p class="songs-help-text" id="songs-help-text">Lim inn en Spotify-spilleliste for egne sanger.</p>
-                <button class="btn-link" id="spotify-reset-btn" onclick="App.resetSongs()" style="display:none">Tilbake til standard</button>
+                <div class="genre-chips" id="genre-chips"></div>
+                <details class="custom-playlist-details">
+                    <summary>Egen spilleliste</summary>
+                    <div class="song-url-row">
+                        <input type="text" id="playlist-url" placeholder="Lim inn Spotify-spilleliste URL" autocomplete="off">
+                        <button class="btn btn-secondary btn-sm" onclick="App.loadPlaylist()">Last</button>
+                    </div>
+                    <p class="songs-help-text" id="songs-help-text">Lim inn en Spotify-spilleliste for egne sanger.</p>
+                    <button class="btn-link" id="spotify-reset-btn" onclick="App.resetSongs()" style="display:none">Tilbake til standard</button>
+                </details>
             </div>
 
             <button class="btn btn-primary btn-large" onclick="App.startGame()">Start</button>
@@ -100,9 +104,6 @@
                         <button class="control-btn control-btn-main" id="btn-play-pause" onclick="Game.togglePlay()" title="Spill/pause" aria-label="Spill eller pause">
                             <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
                         </button>
-                        <button class="control-btn" id="btn-skip" onclick="Game.skipSong()" title="Hopp over sang" aria-label="Hopp over sang">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -136,7 +137,7 @@
     <div id="gm-panel" class="gm-panel">
         <div class="gm-panel-header">
             <h3>Spillkontroll</h3>
-            <button class="gm-close" onclick="Game.closeMenu()">&times;</button>
+            <button class="gm-close" onclick="Game.closeMenu()" aria-label="Lukk meny">&times;</button>
         </div>
         <div class="gm-panel-body" id="gm-panel-body"></div>
     </div>
@@ -164,8 +165,8 @@
     </div>
 
     <script src="https://open.spotify.com/embed/iframe-api/v1"></script>
-    <script src="songs.js?v=16"></script>
-    <script src="game.js?v=16"></script>
-    <script src="app.js?v=16"></script>
+    <script src="songs.js?v=17"></script>
+    <script src="game.js?v=17"></script>
+    <script src="app.js?v=17"></script>
 </body>
 </html>

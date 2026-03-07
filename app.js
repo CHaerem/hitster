@@ -1,11 +1,16 @@
+// Full database backup (never modified)
+const ALL_SONGS = [...SONGS_DATABASE];
+
 // Main application controller
 const App = {
     winCount: 10,
-    defaultSongCount: SONGS_DATABASE.length,
+    defaultSongCount: ALL_SONGS.length,
     _loadingAbort: null,
     _loadGeneration: 0,
     _anonToken: null,
     _anonTokenExpiry: 0,
+    _selectedGenres: new Set(),    // Empty = all genres
+    _usingCustomPlaylist: false,
 
     init() {
         // Sync winCount display from JS default
@@ -24,6 +29,7 @@ const App = {
                 const songs = JSON.parse(cachedSongs);
                 if (songs.length > 0) {
                     SONGS_DATABASE = songs;
+                    this._usingCustomPlaylist = true;
                     const badge = document.getElementById('song-source-badge');
                     const resetBtn = document.getElementById('spotify-reset-btn');
                     if (badge) {
@@ -37,8 +43,20 @@ const App = {
                 console.warn('Failed to restore cached songs:', e);
             }
         } else {
+            // Restore saved genre preferences
+            const savedGenres = localStorage.getItem('hitster-genres');
+            if (savedGenres) {
+                try {
+                    const genres = JSON.parse(savedGenres);
+                    genres.forEach(g => this._selectedGenres.add(g));
+                    this.applyGenreFilter();
+                } catch (e) {}
+            }
             this.updateSongBadge();
         }
+
+        // Render genre chips
+        this.renderGenreChips();
 
         // Enter key support on setup screen: move to next input or start game
         document.getElementById('player-list').addEventListener('keydown', (e) => {
@@ -149,6 +167,7 @@ const App = {
 
             // Replace database and cache
             SONGS_DATABASE = unique;
+            this._usingCustomPlaylist = true;
             localStorage.setItem('hitster-playlist-url', url);
             try {
                 localStorage.setItem('hitster-playlist-songs', JSON.stringify(unique));
@@ -516,15 +535,102 @@ const App = {
         localStorage.removeItem('hitster-playlist-url');
         localStorage.removeItem('hitster-playlist-songs');
         localStorage.removeItem('hitster-playlist-name');
-        location.reload();
+        // Clear any in-progress game since song database is changing
+        Game.clearState();
+        this._usingCustomPlaylist = false;
+        SONGS_DATABASE = [...ALL_SONGS];
+        this._selectedGenres.clear();
+        localStorage.removeItem('hitster-genres');
+        this.applyGenreFilter();
+        this.renderGenreChips();
+        this.updateSongBadge();
+        const badge = document.getElementById('song-source-badge');
+        if (badge) badge.className = 'song-source-badge';
+        const resetBtn = document.getElementById('spotify-reset-btn');
+        if (resetBtn) resetBtn.style.display = 'none';
+        const input = document.getElementById('playlist-url');
+        if (input) input.value = '';
+        this._showSongStatus('Lim inn en Spotify-spilleliste for egne sanger.', '');
     },
 
     updateSongBadge() {
         const badge = document.getElementById('song-source-badge');
         if (badge) {
-            badge.textContent = `Standard (${SONGS_DATABASE.length} sanger)`;
+            const count = SONGS_DATABASE.length;
+            badge.textContent = `${count} sanger`;
             badge.className = 'song-source-badge';
         }
+    },
+
+    // --- Genre Filtering ---
+
+    _genreConfig: [
+        { id: 'pop', label: 'Pop', icon: '🎤' },
+        { id: 'rock', label: 'Rock', icon: '🎸' },
+        { id: 'hiphop', label: 'Hip-Hop', icon: '🎧' },
+        { id: 'electronic', label: 'Elektronisk', icon: '🎹' },
+        { id: 'norsk', label: 'Norsk', icon: '🇳🇴' },
+    ],
+
+    renderGenreChips() {
+        const container = document.getElementById('genre-chips');
+        if (!container) return;
+
+        // Hide chips when using a custom playlist
+        if (this._usingCustomPlaylist) {
+            container.style.display = 'none';
+            return;
+        }
+
+        // Check which genres actually exist in the database
+        const availableGenres = new Set();
+        ALL_SONGS.forEach(s => { if (s.genre) availableGenres.add(s.genre); });
+
+        // If no songs have genres, hide the chips
+        if (availableGenres.size === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = '';
+        container.innerHTML = '';
+
+        for (const g of this._genreConfig) {
+            if (!availableGenres.has(g.id)) continue;
+
+            const chip = document.createElement('button');
+            chip.className = 'genre-chip' + (this._selectedGenres.has(g.id) ? ' active' : '');
+            chip.innerHTML = `<span class="chip-icon">${g.icon}</span> ${g.label}`;
+            chip.setAttribute('aria-pressed', this._selectedGenres.has(g.id));
+            chip.addEventListener('click', () => this.toggleGenre(g.id));
+            container.appendChild(chip);
+        }
+    },
+
+    toggleGenre(genreId) {
+        if (this._selectedGenres.has(genreId)) {
+            this._selectedGenres.delete(genreId);
+        } else {
+            this._selectedGenres.add(genreId);
+        }
+
+        this.applyGenreFilter();
+        this.renderGenreChips();
+
+        // Save preference
+        localStorage.setItem('hitster-genres', JSON.stringify([...this._selectedGenres]));
+    },
+
+    applyGenreFilter() {
+        if (this._usingCustomPlaylist) return; // Don't filter custom playlists
+
+        if (this._selectedGenres.size === 0) {
+            // No filter = all songs
+            SONGS_DATABASE = [...ALL_SONGS];
+        } else {
+            SONGS_DATABASE = ALL_SONGS.filter(s => this._selectedGenres.has(s.genre));
+        }
+        this.updateSongBadge();
     },
 
     // --- Screen Management ---

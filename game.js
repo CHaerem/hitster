@@ -56,16 +56,29 @@ const Game = {
                 return song;
             }
         }
-        // Reshuffle if needed
+        // Try to find remaining unused songs
         this.deck = shuffleArray(SONGS_DATABASE.filter(s => !this.usedSongs.has(this._songKey(s))));
-        if (this.deck.length === 0) {
-            this.usedSongs.clear();
-            this.deck = shuffleArray(SONGS_DATABASE);
+        if (this.deck.length > 0) {
+            const song = this.deck.pop();
+            this.usedSongs.add(this._songKey(song));
+            return song;
         }
-        const song = this.deck.pop();
-        // Guard against empty SONGS_DATABASE
-        if (!song) return { title: 'Ukjent', artist: 'Ukjent', year: 2000, spotifyId: null };
-        return song;
+        // No songs left — end game, player with most cards wins
+        this.endGameNoSongs();
+        return null;
+    },
+
+    endGameNoSongs() {
+        this.pausePlayback();
+        const winner = [...this.players].sort((a, b) => b.score - a.score)[0];
+        document.getElementById('winner-name').textContent = winner.name;
+        const scoresEl = document.getElementById('final-scores');
+        scoresEl.innerHTML = '<p style="margin-bottom:10px;color:var(--text-dim)">Alle sanger er brukt opp!</p>' +
+            this.players.map(p =>
+                `<div class="final-score-row"><span>${this.escapeHtml(p.name)}</span><span>${p.score} kort</span></div>`
+            ).join('');
+        localStorage.removeItem('hitster-game-state');
+        App.showScreen('screen-winner');
     },
 
     // =============================================
@@ -359,6 +372,7 @@ const Game = {
     skipSong() {
         this.pausePlayback();
         this.currentSong = this.drawSong();
+        if (!this.currentSong) return; // Game ended — no songs left
         this.hasPlayedSong = false;
         this.isWaitingForPlacement = true;
         this.selectedDropIndex = null;
@@ -387,6 +401,7 @@ const Game = {
             this.currentSong = resumeSong;
         } else {
             this.currentSong = this.drawSong();
+            if (!this.currentSong) return; // Game ended — no songs left
         }
         this.isWaitingForPlacement = true;
         this.selectedDropIndex = null;
@@ -656,6 +671,8 @@ const Game = {
             cardsToWin: this.cardsToWin,
             usedSongs: [...this.usedSongs],
             currentSong: this.currentSong,
+            hasPlayedSong: this.hasPlayedSong,
+            isWaitingForPlacement: this.isWaitingForPlacement,
         };
         try {
             localStorage.setItem('hitster-game', JSON.stringify(state));
@@ -689,7 +706,8 @@ const Game = {
             this.usedSongs = new Set(Array.isArray(state.usedSongs) ? state.usedSongs : []);
             this.deck = shuffleArray(SONGS_DATABASE.filter(s => !this.usedSongs.has(this._songKey(s))));
             this.currentSong = state.currentSong || null;
-            this.isWaitingForPlacement = false;
+            this.hasPlayedSong = !!state.hasPlayedSong;
+            this.isWaitingForPlacement = !!state.isWaitingForPlacement;
             this.selectedDropIndex = null;
             this._isPlaying = false;
             return true;
@@ -764,6 +782,7 @@ const Game = {
 
         html += `<div class="gm-section"><h4>Info</h4>
             <p class="gm-empty">${this.deck.length} sanger igjen i bunken</p>
+            <button class="btn btn-secondary gm-btn-skip" onclick="Game.skipSong(); Game.closeMenu();" style="margin-top:10px; width:100%">⏭ Hopp over sang</button>
         </div>`;
 
         html += `<div class="gm-section">
@@ -816,6 +835,7 @@ const Game = {
         const player = this.players[playerIndex];
         if (delta > 0) {
             const card = this.drawSong();
+            if (!card) return; // No songs left
             player.timeline.push({ title: card.title, artist: card.artist, year: card.year });
             player.timeline.sort((a, b) => a.year - b.year);
         } else if (delta < 0 && player.timeline.length > 0) {
@@ -826,6 +846,13 @@ const Game = {
         this.renderScores();
         this.renderTimeline();
         this.renderMenu();
+
+        // Check if this pushed someone to win
+        const winner = this.players.find(p => p.score >= this.cardsToWin);
+        if (winner) {
+            this.closeMenu();
+            this.showWinner(winner);
+        }
     },
 
     gmRemoveCard(playerIndex, cardIndex) {
@@ -849,6 +876,7 @@ const Game = {
         }
 
         const startCard = this.drawSong();
+        if (!startCard) return; // No songs left
         this.players.push({
             name,
             timeline: [{ title: startCard.title, artist: startCard.artist, year: startCard.year }],
@@ -873,6 +901,12 @@ const Game = {
         }
 
         if (wasCurrentPlayer) {
+            // Clean up any active placement state
+            this.isWaitingForPlacement = false;
+            this.selectedDropIndex = null;
+            const confirmEl = document.querySelector('.confirm-placement');
+            if (confirmEl) confirmEl.remove();
+
             this.saveState();
             this.closeMenu();
             this.renderScores();
