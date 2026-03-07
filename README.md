@@ -1,6 +1,6 @@
 # 🎵 Hitster
 
-> **[Spill Hitster](https://chaerem.github.io/hitster/)**
+> **[Spill Hitster](https://chaerem.github.io/Hitster/)**
 
 En nettbasert versjon av musikkquiz-spillet Hitster. Lytt til sanger og plasser dem i riktig kronologisk rekkefølge på tidslinjen din. Førstemann til 10 kort vinner!
 
