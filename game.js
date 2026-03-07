@@ -11,7 +11,7 @@ const Game = {
     spotifyAPI: null,
     embedController: null,
     hasPlayedSong: false,
-    lastPlacement: null,
+    _isPlaying: false,
 
     // Initialize a new game
     init(playerNames, cardsToWin) {
@@ -22,6 +22,7 @@ const Game = {
         this.currentSong = null;
         this.isWaitingForPlacement = false;
         this.selectedDropIndex = null;
+        this._isPlaying = false;
 
         // Each player starts with 1 card in their timeline
         this.players = playerNames.map(name => {
@@ -40,36 +41,55 @@ const Game = {
         return this.players[this.currentPlayerIndex];
     },
 
-    // Draw next song from deck
+    // Draw next song from deck (case-insensitive dedup, consistent with app.js)
+    _songKey(song) {
+        return `${song.title.toLowerCase()}-${song.artist.toLowerCase()}`;
+    },
+
     drawSong() {
         while (this.deck.length > 0) {
             const song = this.deck.pop();
-            const key = `${song.title}-${song.artist}`;
+            const key = this._songKey(song);
             if (!this.usedSongs.has(key)) {
                 this.usedSongs.add(key);
                 return song;
             }
         }
         // Reshuffle if needed
-        this.deck = shuffleArray(SONGS_DATABASE.filter(s => {
-            const key = `${s.title}-${s.artist}`;
-            return !this.usedSongs.has(key);
-        }));
+        this.deck = shuffleArray(SONGS_DATABASE.filter(s => !this.usedSongs.has(this._songKey(s))));
         if (this.deck.length === 0) {
             this.usedSongs.clear();
             this.deck = shuffleArray(SONGS_DATABASE);
         }
-        return this.deck.pop();
+        const song = this.deck.pop();
+        // Guard against empty SONGS_DATABASE
+        if (!song) return { title: 'Ukjent', artist: 'Ukjent', year: 2000, spotifyId: null };
+        return song;
     },
 
-    // Load song into hidden embed (user triggers play via cover button)
+    // =============================================
+    // Spotify Playback
+    // =============================================
+
     _loadGeneration: 0,
     _loadTimeout: null,
 
+    // Validate spotifyId to prevent XSS (only alphanumeric)
+    _isValidSpotifyId(id) {
+        return typeof id === 'string' && /^[a-zA-Z0-9]{10,30}$/.test(id);
+    },
+
     loadSong(spotifyId) {
+        // Validate spotifyId before using in any HTML/URL context
+        if (!this._isValidSpotifyId(spotifyId)) {
+            console.warn('Invalid spotifyId, skipping load:', spotifyId);
+            return;
+        }
+
         // Increment generation to invalidate any stale callbacks
         this._loadGeneration++;
         const gen = this._loadGeneration;
+        this._isPlaying = false;
 
         // Clear any pending retry timeout
         if (this._loadTimeout) {
@@ -77,29 +97,27 @@ const Game = {
             this._loadTimeout = null;
         }
 
-        // Reset cover UI - disable play button until controller is ready
-        const playBtn = document.getElementById('cover-play-btn');
-        playBtn.style.display = '';
-        playBtn.disabled = true;
-        playBtn.style.opacity = '0.4';
-        document.getElementById('listening-bars').style.display = 'none';
-        document.querySelector('.listening-text').textContent = 'Laster sang...';
+        // Reset playback UI
+        this._updatePlaybackUI('loading');
 
         if (!this.spotifyAPI) {
+            // API might still be loading (e.g., page refresh) — retry a few times
+            if (!this._apiRetryCount) this._apiRetryCount = 0;
+            if (this._apiRetryCount < 5) {
+                this._apiRetryCount++;
+                this._loadTimeout = setTimeout(() => {
+                    if (gen !== this._loadGeneration) return;
+                    this.loadSong(spotifyId);
+                }, 800);
+                return;
+            }
+            // After retries, API genuinely unavailable (adblock, network error)
+            this._apiRetryCount = 0;
             this.stopPlayback();
-            const container = document.getElementById('spotify-embed');
-            container.innerHTML = `<iframe
-                src="https://open.spotify.com/embed/track/${spotifyId}?theme=0"
-                width="100%"
-                height="152"
-                frameBorder="0"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                loading="lazy"></iframe>`;
-            playBtn.disabled = false;
-            playBtn.style.opacity = '';
-            document.querySelector('.listening-text').textContent = 'Trykk for å spille';
+            this._updatePlaybackUI('error');
             return;
         }
+        this._apiRetryCount = 0;
 
         const uri = `spotify:track:${spotifyId}`;
 
@@ -107,12 +125,11 @@ const Game = {
         if (this.embedController) {
             try {
                 this.embedController.loadUri(uri);
-                this._addSpotifyListeners(this.embedController, gen);
+                // Don't add listeners again — existing listeners check this._loadGeneration
 
                 // Short timeout — loadUri on existing controller should be fast
                 this._loadTimeout = setTimeout(() => {
                     if (gen !== this._loadGeneration) return;
-                    // loadUri didn't work — destroy and create fresh controller
                     console.warn('loadUri timeout, creating fresh controller');
                     this.stopPlayback();
                     this._createSpotifyController(spotifyId, gen, 0);
@@ -128,46 +145,34 @@ const Game = {
         this._createSpotifyController(spotifyId, gen, 0);
     },
 
-    // Shared listener setup — used by both loadUri and createController paths
-    _addSpotifyListeners(controller, gen) {
+    // Listeners added ONLY when creating a new controller (prevents accumulation)
+    _setupListeners(controller) {
         controller.addListener('ready', () => {
-            if (gen !== this._loadGeneration) return;
             if (this._loadTimeout) {
                 clearTimeout(this._loadTimeout);
                 this._loadTimeout = null;
             }
-            const playBtn = document.getElementById('cover-play-btn');
-            playBtn.disabled = false;
-            playBtn.style.opacity = '';
-            document.querySelector('.listening-text').textContent = 'Trykk for å spille';
+            this._updatePlaybackUI('ready');
         });
 
         controller.addListener('playback_update', (e) => {
-            if (gen !== this._loadGeneration) return;
             if (!e.data) return;
-            const bars = document.getElementById('listening-bars');
-            const btn = document.getElementById('cover-play-btn');
-            const text = document.querySelector('.listening-text');
 
             if (!e.data.isPaused && !e.data.isBuffering) {
-                // Audio is actually playing — clear any pending timeout
+                // Audio is actually playing
+                this._isPlaying = true;
                 if (this._loadTimeout) {
                     clearTimeout(this._loadTimeout);
                     this._loadTimeout = null;
                 }
-                btn.style.display = 'none';
-                bars.style.display = 'flex';
-                text.textContent = 'Lytt og plasser sangen i tidslinjen';
+                this._updatePlaybackUI('playing');
                 if (!this.hasPlayedSong) {
                     this.hasPlayedSong = true;
                     this.renderTimeline();
                 }
             } else if (e.data.isPaused) {
-                btn.style.display = '';
-                btn.disabled = false;
-                btn.style.opacity = '';
-                bars.style.display = 'none';
-                text.textContent = 'Trykk for å spille';
+                this._isPlaying = false;
+                this._updatePlaybackUI('paused');
             }
         });
     },
@@ -198,9 +203,7 @@ const Game = {
             } else {
                 // Max retries — enable button so user isn't stuck
                 console.warn('Spotify embed timeout after retries');
-                const playBtn = document.getElementById('cover-play-btn');
-                playBtn.disabled = false;
-                playBtn.style.opacity = '';
+                this._updatePlaybackUI('ready');
                 document.querySelector('.listening-text').textContent = 'Trykk for å prøve igjen';
             }
         }, 4000);
@@ -212,7 +215,7 @@ const Game = {
                 (controller) => {
                     if (gen !== this._loadGeneration) return;
                     this.embedController = controller;
-                    this._addSpotifyListeners(controller, gen);
+                    this._setupListeners(controller);
                 }
             );
         } catch (e) {
@@ -222,54 +225,120 @@ const Game = {
                 clearTimeout(this._loadTimeout);
                 this._loadTimeout = null;
             }
-            const playBtn = document.getElementById('cover-play-btn');
-            playBtn.disabled = false;
-            playBtn.style.opacity = '';
+            this._updatePlaybackUI('ready');
             document.querySelector('.listening-text').textContent = 'Trykk for å prøve igjen';
         }
     },
 
-    // Pause playback but keep controller alive for reuse
+    // Centralized playback UI state manager
+    _updatePlaybackUI(state) {
+        const playPauseBtn = document.getElementById('btn-play-pause');
+        const replayBtn = document.getElementById('btn-replay');
+        const bars = document.getElementById('listening-bars');
+        const text = document.querySelector('.listening-text');
+        const controls = document.getElementById('playback-controls');
+
+        if (!playPauseBtn || !bars || !text || !controls) return;
+
+        // Play/pause icon SVGs
+        const playIcon = '<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>';
+        const pauseIcon = '<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>';
+
+        switch (state) {
+            case 'loading':
+                playPauseBtn.innerHTML = playIcon;
+                playPauseBtn.disabled = true;
+                playPauseBtn.style.opacity = '0.4';
+                if (replayBtn) { replayBtn.disabled = true; replayBtn.style.opacity = '0.4'; }
+                bars.style.display = 'none';
+                controls.style.display = 'flex';
+                text.textContent = 'Laster sang...';
+                break;
+
+            case 'ready':
+                playPauseBtn.innerHTML = playIcon;
+                playPauseBtn.disabled = false;
+                playPauseBtn.style.opacity = '';
+                if (replayBtn) { replayBtn.disabled = false; replayBtn.style.opacity = ''; }
+                bars.style.display = 'none';
+                controls.style.display = 'flex';
+                text.textContent = 'Trykk for å spille';
+                break;
+
+            case 'playing':
+                playPauseBtn.innerHTML = pauseIcon;
+                playPauseBtn.disabled = false;
+                playPauseBtn.style.opacity = '';
+                if (replayBtn) { replayBtn.disabled = false; replayBtn.style.opacity = ''; }
+                bars.style.display = 'flex';
+                controls.style.display = 'flex';
+                text.textContent = 'Lytt og plasser sangen i tidslinjen';
+                break;
+
+            case 'paused':
+                playPauseBtn.innerHTML = playIcon;
+                playPauseBtn.disabled = false;
+                playPauseBtn.style.opacity = '';
+                if (replayBtn) { replayBtn.disabled = false; replayBtn.style.opacity = ''; }
+                bars.style.display = 'none';
+                controls.style.display = 'flex';
+                text.textContent = 'Trykk for å spille';
+                break;
+
+            case 'error':
+                playPauseBtn.innerHTML = playIcon;
+                playPauseBtn.disabled = true;
+                playPauseBtn.style.opacity = '0.4';
+                if (replayBtn) { replayBtn.disabled = true; replayBtn.style.opacity = '0.4'; }
+                bars.style.display = 'none';
+                controls.style.display = 'flex';
+                text.textContent = 'Spotify kunne ikke lastes. Sjekk at adblocker ikke blokkerer.';
+                break;
+        }
+    },
+
+    // Pause playback only if currently playing (safe — won't resume)
     pausePlayback() {
         if (this._loadTimeout) {
             clearTimeout(this._loadTimeout);
             this._loadTimeout = null;
         }
-        if (this.embedController) {
+        if (this.embedController && this._isPlaying) {
             try { this.embedController.togglePlay(); } catch (e) {}
+            this._isPlaying = false;
         }
     },
 
     // Stop playback and destroy the embed completely
     stopPlayback() {
-        // Cancel any pending load timeout/retry
         if (this._loadTimeout) {
             clearTimeout(this._loadTimeout);
             this._loadTimeout = null;
         }
         if (this.embedController) {
-            try { this.embedController.togglePlay(); } catch (e) {}
+            if (this._isPlaying) {
+                try { this.embedController.togglePlay(); } catch (e) {}
+            }
             this.embedController = null;
         }
+        this._isPlaying = false;
         const container = document.getElementById('spotify-embed');
         if (container) container.innerHTML = '';
     },
 
-    // Called from play button on cover (direct user gesture = reliable)
+    // Called from play/pause button (direct user gesture = reliable)
     togglePlay() {
         if (this.embedController) {
             try {
                 this.embedController.togglePlay();
             } catch (e) {
                 console.error('togglePlay error:', e);
-                // If togglePlay fails, try reloading the song
-                if (this.currentSong && this.currentSong.spotifyId) {
+                if (this.currentSong && this._isValidSpotifyId(this.currentSong.spotifyId)) {
                     this.loadSong(this.currentSong.spotifyId);
                 }
                 return;
             }
-        } else if (this.currentSong && this.currentSong.spotifyId) {
-            // No controller exists (was destroyed or never created) - reload
+        } else if (this.currentSong && this._isValidSpotifyId(this.currentSong.spotifyId)) {
             this.loadSong(this.currentSong.spotifyId);
             return;
         }
@@ -277,20 +346,28 @@ const Game = {
         document.querySelector('.listening-text').textContent = 'Starter avspilling...';
     },
 
-    // Start a new turn (or resume a saved turn)
+    // Replay song from beginning
+    replayFromStart() {
+        if (this.currentSong && this._isValidSpotifyId(this.currentSong.spotifyId)) {
+            this.loadSong(this.currentSong.spotifyId);
+        }
+    },
+
+    // =============================================
+    // Turn Management
+    // =============================================
+
     startTurn(resumeSong) {
         if (resumeSong) {
-            // Resuming after page refresh — use the saved song
             this.currentSong = resumeSong;
         } else {
-            // Normal new turn — draw a fresh song
             this.currentSong = this.drawSong();
         }
         this.isWaitingForPlacement = true;
         this.selectedDropIndex = null;
         this.hasPlayedSong = false;
+        this._isPlaying = false;
 
-        // Save immediately so currentSong persists across refresh
         this.saveState();
 
         // Update UI
@@ -301,8 +378,15 @@ const Game = {
         // Hide embed and show listening cover, then load + autoplay
         const wrapper = document.querySelector('.spotify-player-wrapper');
         wrapper.classList.add('hidden-player');
-        if (this.currentSong.spotifyId) {
+        if (this.currentSong && this._isValidSpotifyId(this.currentSong.spotifyId)) {
             this.loadSong(this.currentSong.spotifyId);
+        } else {
+            // Song has no valid spotifyId — show error
+            this._updatePlaybackUI('error');
+            document.querySelector('.listening-text').textContent = 'Sangen har ingen avspillings-ID.';
+            // Still allow placement (drop zones will show but no music)
+            this.hasPlayedSong = true;
+            this.renderTimeline();
         }
     },
 
@@ -324,15 +408,6 @@ const Game = {
         const player = this.currentPlayer;
         const correct = this.isPlacementCorrect(player.timeline, this.currentSong, dropIndex);
 
-        // Store undo data BEFORE modifying timeline
-        this.lastPlacement = {
-            playerIndex: this.currentPlayerIndex,
-            song: { ...this.currentSong },
-            wasCorrect: correct,
-            timelineBefore: player.timeline.map(c => ({ ...c })),
-            scoreBefore: player.score,
-        };
-
         if (correct) {
             player.timeline.splice(dropIndex, 0, {
                 title: this.currentSong.title,
@@ -346,35 +421,6 @@ const Game = {
         this.showReveal(correct);
     },
 
-    // Undo last placement and let player try again
-    undoPlacement() {
-        if (!this.lastPlacement) return;
-
-        const lp = this.lastPlacement;
-        const player = this.players[lp.playerIndex];
-
-        // Restore timeline and score
-        player.timeline = lp.timelineBefore;
-        player.score = lp.scoreBefore;
-
-        // Restore current song so player can re-place
-        this.currentSong = lp.song;
-        this.isWaitingForPlacement = true;
-        this.selectedDropIndex = null;
-        this.hasPlayedSong = true; // Keep drop zones visible
-
-        // Clear undo (only one undo per placement)
-        this.lastPlacement = null;
-
-        // Close reveal overlay
-        document.getElementById('song-reveal-overlay').classList.remove('active');
-
-        // Re-render
-        this.renderScores();
-        this.renderTimeline();
-        this.saveState();
-    },
-
     showReveal(correct) {
         const overlay = document.getElementById('song-reveal-overlay');
         const icon = document.getElementById('reveal-result-icon');
@@ -382,7 +428,6 @@ const Game = {
         const name = document.getElementById('reveal-song-name');
         const artist = document.getElementById('reveal-song-artist');
         const year = document.getElementById('reveal-song-year');
-        const spotifyLink = document.getElementById('reveal-spotify-link');
 
         icon.className = 'reveal-icon ' + (correct ? 'correct' : 'wrong');
         title.textContent = correct ? 'Riktig!' : 'Feil!';
@@ -390,23 +435,11 @@ const Game = {
         artist.textContent = this.currentSong.artist;
         year.textContent = this.currentSong.year;
 
-        if (this.currentSong.spotifyId) {
-            spotifyLink.href = `https://open.spotify.com/track/${this.currentSong.spotifyId}`;
-            spotifyLink.style.display = 'inline-flex';
-        } else {
-            spotifyLink.style.display = 'none';
-        }
-
-        // Show undo button only if we have undo data
-        const undoBtn = document.getElementById('reveal-undo-btn');
-        undoBtn.style.display = this.lastPlacement ? '' : 'none';
-
         overlay.classList.add('active');
     },
 
     nextTurn() {
-        this.lastPlacement = null;
-        this.currentSong = null; // Clear so refresh between turns doesn't resume old song
+        this.currentSong = null;
         const overlay = document.getElementById('song-reveal-overlay');
         overlay.classList.remove('active');
 
@@ -421,14 +454,12 @@ const Game = {
         this.showPassPhone();
     },
 
-    // Show "pass the phone" interstitial between turns
     showPassPhone() {
         const passOverlay = document.getElementById('pass-phone-overlay');
         document.getElementById('pass-phone-name').textContent = this.currentPlayer.name;
         passOverlay.classList.add('active');
     },
 
-    // Called when next player is ready
     onPlayerReady() {
         document.getElementById('pass-phone-overlay').classList.remove('active');
         this.startTurn();
@@ -450,6 +481,10 @@ const Game = {
 
         App.showScreen('screen-winner');
     },
+
+    // =============================================
+    // Rendering
+    // =============================================
 
     renderScores() {
         const el = document.getElementById('game-scores');
@@ -570,39 +605,55 @@ const Game = {
         }
     },
 
-    // Save game state to localStorage
+    // =============================================
+    // State Persistence
+    // =============================================
+
     saveState() {
         const state = {
             players: this.players,
             currentPlayerIndex: this.currentPlayerIndex,
             cardsToWin: this.cardsToWin,
             usedSongs: [...this.usedSongs],
-            lastPlacement: this.lastPlacement,
             currentSong: this.currentSong,
         };
-        localStorage.setItem('hitster-game', JSON.stringify(state));
+        try {
+            localStorage.setItem('hitster-game', JSON.stringify(state));
+        } catch (e) {
+            console.warn('Could not save game state:', e.message);
+        }
     },
 
-    // Restore game state from localStorage (returns true if restored)
     restoreState() {
         const data = localStorage.getItem('hitster-game');
         if (!data) return false;
         try {
             const state = JSON.parse(data);
+
+            // Validate structure to prevent crashes from corrupt data
+            if (!Array.isArray(state.players) || state.players.length < 2) return false;
+            if (typeof state.currentPlayerIndex !== 'number') return false;
+            if (state.currentPlayerIndex < 0 || state.currentPlayerIndex >= state.players.length) return false;
+            if (typeof state.cardsToWin !== 'number' || state.cardsToWin < 1) return false;
+            if (!state.players.every(p =>
+                typeof p.name === 'string' && p.name.length > 0 &&
+                Array.isArray(p.timeline) &&
+                typeof p.score === 'number'
+            )) return false;
+
             this.players = state.players;
             this.currentPlayerIndex = state.currentPlayerIndex;
             this.cardsToWin = state.cardsToWin;
-            this.usedSongs = new Set(state.usedSongs);
-            this.deck = shuffleArray(SONGS_DATABASE.filter(s => {
-                const key = `${s.title}-${s.artist}`;
-                return !this.usedSongs.has(key);
-            }));
+            this.usedSongs = new Set(Array.isArray(state.usedSongs) ? state.usedSongs : []);
+            this.deck = shuffleArray(SONGS_DATABASE.filter(s => !this.usedSongs.has(this._songKey(s))));
             this.currentSong = state.currentSong || null;
             this.isWaitingForPlacement = false;
             this.selectedDropIndex = null;
-            this.lastPlacement = state.lastPlacement || null;
+            this._isPlaying = false;
             return true;
         } catch {
+            // Corrupt data — clear it
+            this.clearState();
             return false;
         }
     },
@@ -611,7 +662,10 @@ const Game = {
         localStorage.removeItem('hitster-game');
     },
 
-    // --- Hamburger Menu ---
+    // =============================================
+    // Hamburger Menu (Game Master)
+    // =============================================
+
     toggleMenu() {
         const panel = document.getElementById('gm-panel');
         const backdrop = document.getElementById('gm-backdrop');
@@ -633,7 +687,6 @@ const Game = {
         const body = document.getElementById('gm-panel-body');
         let html = '';
 
-        // Section: Players & Scores
         html += '<div class="gm-section"><h4>Spillere</h4>';
         this.players.forEach((player, i) => {
             html += `
@@ -658,7 +711,6 @@ const Game = {
             </div>`;
         html += '</div>';
 
-        // Section: Timeline Editor
         html += '<div class="gm-section"><h4>Rediger tidslinje</h4>';
         html += '<select id="gm-timeline-player" onchange="Game.gmRenderTimeline()">';
         this.players.forEach((player, i) => {
@@ -668,7 +720,6 @@ const Game = {
         html += '<div id="gm-timeline-cards"></div>';
         html += '</div>';
 
-        // Section: Restart
         html += `<div class="gm-section">
             <button class="btn btn-danger gm-btn-restart" onclick="Game.gmRestart()">Start på nytt</button>
         </div>`;
@@ -697,15 +748,12 @@ const Game = {
         `).join('');
     },
 
-    // --- Game Master Actions ---
     gmMovePlayer(playerIndex, direction) {
         const newIndex = playerIndex + direction;
         if (newIndex < 0 || newIndex >= this.players.length) return;
 
-        // Swap players
         [this.players[playerIndex], this.players[newIndex]] = [this.players[newIndex], this.players[playerIndex]];
 
-        // Keep currentPlayerIndex pointing to the same player
         if (this.currentPlayerIndex === playerIndex) {
             this.currentPlayerIndex = newIndex;
         } else if (this.currentPlayerIndex === newIndex) {

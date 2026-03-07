@@ -255,10 +255,10 @@ const App = {
 
         const trackList = entity.trackList
             .map(t => {
-                const idMatch = t.uri?.match(/spotify:track:(.+)/);
+                const idMatch = t.uri?.match(/spotify:track:([a-zA-Z0-9]+)/);
                 return { title: t.title, artist: t.subtitle, spotifyId: idMatch?.[1] };
             })
-            .filter(t => t.spotifyId && t.title);
+            .filter(t => t.spotifyId && t.title && /^[a-zA-Z0-9]{10,30}$/.test(t.spotifyId));
 
         const playlistName = entity.name || entity.title;
 
